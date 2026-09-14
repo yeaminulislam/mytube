@@ -1,17 +1,59 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getSearchSuggestions } from '../services/youtubeApi';
 
 export default function Header({ onSearch, searchQuery, onToggleSidebar }) {
   const [inputValue, setInputValue] = useState(searchQuery || '');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Debounced suggestions - YouTube Autocomplete
+  useEffect(() => {
+    if (!inputValue.trim()) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const suggs = await getSearchSuggestions(inputValue);
+        setSuggestions(suggs);
+      } catch (e) {
+        console.error('Suggestions error:', e);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [inputValue]);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    if (!inputValue.trim()) return;
+    setShowSuggestions(false);
     onSearch(inputValue);
     navigate(`/?q=${encodeURIComponent(inputValue)}`);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setInputValue(suggestion);
+    setShowSuggestions(false);
+    onSearch(suggestion);
+    navigate(`/?q=${encodeURIComponent(suggestion)}`);
   };
 
   return (
@@ -34,17 +76,44 @@ export default function Header({ onSearch, searchQuery, onToggleSidebar }) {
         </Link>
       </div>
 
-      {/* Center - Search */}
-      <form onSubmit={handleSearch} className="flex-1 max-w-[600px] flex">
-        <div className="flex flex-1">
+      {/* Center - Search with Suggestions */}
+      <form onSubmit={handleSearch} className="flex-1 max-w-[600px] flex" ref={searchRef}>
+        <div className="flex flex-1 relative">
           <div className="flex flex-1 relative">
             <input
               type="text"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => inputValue && setShowSuggestions(true)}
               placeholder="সার্চ করুন"
               className="w-full bg-[#121212] border border-[#303030] rounded-l-full px-5 py-[10px] text-[16px] focus:outline-none focus:border-[#1c62b9] placeholder:text-[#888]"
             />
+            {/* Suggestions Dropdown - Like Real YouTube */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#212121] rounded-xl shadow-2xl border border-[#303030] overflow-hidden z-50">
+                <div className="py-2">
+                  {suggestions.map((sugg, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSuggestionClick(sugg)}
+                      className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4 text-sm"
+                    >
+                      <svg className="w-4 h-4 text-[#717171]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      {sugg}
+                    </button>
+                  ))}
+                </div>
+                <div className="px-4 py-2 border-t border-[#303030] text-xs text-[#717171]">
+                  💡 Real YouTube Suggest API: <code className="bg-[#303030] px-1 rounded">suggestqueries.google.com</code>
+                </div>
+              </div>
+            )}
           </div>
           <button type="submit" className="bg-[#222222] border border-l-0 border-[#303030] rounded-r-full px-6 hover:bg-[#272727]">
             <svg className="w-5 h-5" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
@@ -81,26 +150,34 @@ export default function Header({ onSearch, searchQuery, onToggleSidebar }) {
               <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full" />
             </button>
             {showUserMenu && (
-              <div className="absolute right-0 top-12 w-72 bg-[#212121] rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute right-0 top-12 w-80 bg-[#212121] rounded-xl shadow-2xl overflow-hidden z-50 border border-[#303030]">
                 <div className="p-4 flex gap-3 border-b border-[#303030]">
                   <img src={user.avatar} className="w-10 h-10 rounded-full" alt="" />
-                  <div>
-                    <p className="font-medium">{user.name}</p>
-                    <p className="text-sm text-[#aaa]">{user.email}</p>
-                    <Link to="#" className="text-sm text-[#3ea6ff] mt-1 block">Google অ্যাকাউন্ট পরিচালনা করুন</Link>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{user.name}</p>
+                    <p className="text-sm text-[#aaa] truncate">{user.email}</p>
+                    <p className="text-xs mt-1">
+                      <span className={`px-2 py-0.5 rounded-full ${user.provider === 'google' ? 'bg-blue-900/30 text-blue-400 border border-blue-800' : 'bg-[#303030] text-[#aaa]'}`}>
+                        {user.provider === 'google' ? '🔐 Google OAuth' : '📧 Email'}
+                      </span>
+                      {user.idToken && <span className="ml-1 bg-green-900/30 text-green-400 px-1.5 py-0.5 rounded-full text-[10px]">JWT ✓</span>}
+                    </p>
                   </div>
                 </div>
                 <div className="py-2">
-                  <button className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4">
+                  <div className="px-4 py-2 bg-[#181818] m-2 rounded-lg text-xs">
+                    <p className="text-[#aaa] font-medium">🔑 Auth Debug:</p>
+                    <p className="text-[#717171] mt-1 font-mono text-[11px] break-all">ID: {user.id?.substring(0, 20)}...</p>
+                    <p className="text-[#717171] font-mono text-[11px]">Provider: {user.provider}</p>
+                    <p className="text-[#717171] font-mono text-[11px]">Joined: {new Date(user.joinedAt).toLocaleDateString()}</p>
+                  </div>
+                  <button className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4 text-sm">
                     <span>👤</span> আপনার চ্যানেল
                   </button>
-                  <button className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4">
-                    <span>💰</span> কেনাকাটা এবং সদস্যতা
-                  </button>
-                  <button className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4">
+                  <button className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4 text-sm">
                     <span>⚙️</span> সেটিংস
                   </button>
-                  <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4 border-t border-[#303030] mt-2">
+                  <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-[#303030] flex items-center gap-4 border-t border-[#303030] mt-2 text-sm">
                     <span>🚪</span> লগআউট
                   </button>
                 </div>

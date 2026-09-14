@@ -21,6 +21,9 @@ export default function Sidebar({ collapsed }) {
     { icon: "🎵", label: "মিউজিক", path: "/music" },
     { icon: "🎮", label: "গেমিং", path: "/gaming" },
     { icon: "📰", label: "খবর", path: "/news" },
+    { divider: true },
+    { icon: "🔧", label: "API Debugger", path: "/debug", section: "ডেভেলপার" },
+    { icon: "📚", label: "API Setup গাইড", path: "/debug", section: "" },
   ];
 
   if (collapsed) {

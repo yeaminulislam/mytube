@@ -1,178 +1,322 @@
-# MyTube - ইউটিউব ক্লোন 🎬 (Android Developer Learning Project)
+# MyTube - Full Functional YouTube Clone 🎬 (Real YouTube API)
 
-আমিনের জন্য বিশেষভাবে তৈরি - একজন অ্যান্ড্রয়েড ডেভেলপার হওয়ার যাত্রায় প্রথম প্রজেক্ট!
+আমিনের জন্য - **Demo নয়, Real YouTube এর মতো Fully Functional!**
 
-## 🚀 লাইভ ডেমো
-প্রজেক্টটি এখন চলছে: `npm run dev` -> http://localhost:5173
+## 🚀 এখন কি কি Real?
 
-## ✨ ফিচারসমূহ
+### ✅ আগে ছিল Demo, এখন Real API Ready
 
-### 1. 🎥 ভিডিও দেখা
-- YouTube এর মতো ভিডিও প্লেয়ার (YouTube Embed API)
-- ভিডিওর টাইটেল, চ্যানেল, ভিউ, লাইক, ডিসলাইক
-- রিলেটেড ভিডিও সাজেশন
-- কমেন্ট সিস্টেম
+| Feature | আগে (Mock) | এখন (Real API) |
+|---------|------------|----------------|
+| ভিডিও সার্চ | Mock filter | **YouTube Data API v3 /search** |
+| Trending | Mock data | **/videos?chart=mostPopular** |
+| Video Details | Mock | **/videos?id=...&part=statistics,contentDetails** |
+| Comments | Mock | **/commentThreads?videoId=...** |
+| Channel Info | Mock | **/channels?id=...** |
+| Shorts | Mock | **/search?type=video&videoDuration=short** |
+| Search Suggestions | Mock | **suggestqueries.google.com (YouTube Autocomplete)** |
+| Google Login | Mock user | **Google Identity Services (GSI) + JWT + OAuth 2.0** |
 
-### 2. 🔍 সার্চ
-- রিয়েল-টাইম সার্চ (টাইটেল, চ্যানেল, ক্যাটাগরি অনুযায়ী)
-- URL query support (`/?q=android`)
-- ক্যাটাগরি ফিল্টার (সব, প্রোগ্রামিং, অ্যান্ড্রয়েড, ইত্যাদি)
+---
 
-### 3. 🔐 লগইন সিস্টেম
-- ইমেইল/পাসওয়ার্ড লগইন (Demo - localStorage)
-- Google দিয়ে লগইন (Mock)
-- ইউজার প্রোফাইল মেনু
-- লগআউট
-- কমেন্ট করতে লগইন প্রয়োজন
+## 🔑 কিভাবে Real API কানেক্ট করবেন? (3 মিনিট)
 
-### 4. 📱 YouTube Shorts
-- ভার্টিকাল স্ক্রল (Snap scroll)
-- কিবোর্ড ন্যাভিগেশন (Arrow Up/Down)
-- লাইক, ডিসলাইক, শেয়ার, কমেন্ট
-- সাবস্ক্রাইব
-- ডেস্কটপে অ্যারো বাটন, মোবাইলে সোয়াইপ
+### Step 1: YouTube Data API Key
 
-### 5. 📱 Responsive & PWA Ready
-- মোবাইল বটম ন্যাভিগেশন
-- ডেস্কটপ সাইডবার (collapsible)
-- PWA manifest (Android এ Install করা যাবে)
-- YouTube এর মতো Dark Theme
+1. https://console.cloud.google.com/ -> New Project -> MyTube
+2. APIs & Services -> Library -> **YouTube Data API v3** -> Enable
+3. Credentials -> Create Credentials -> **API Key** -> Copy
 
-## 🛠️ টেক স্ট্যাক
+### Step 2: Google OAuth Client ID
 
-- **React 18** + **Vite**
-- **React Router** - Navigation
-- **Tailwind CSS** - Styling
-- **Context API** - Auth State
-- **YouTube Embed** - Video Player
-- **LocalStorage** - Mock Auth
+1. Credentials -> Create Credentials -> **OAuth Client ID**
+2. Web Application -> 
+   - Authorized JS origins: `http://localhost:5173`
+   - Redirect URIs: `http://localhost:5173`
+3. Client ID Copy
 
-## 📂 প্রজেক্ট স্ট্রাকচার
+### Step 3: .env ফাইল
 
-```
-src/
-├── components/
-│   ├── Header.jsx       # সার্চ, লোগো, ইউজার মেনু
-│   ├── Sidebar.jsx      # YouTube স্টাইল সাইডবার
-│   ├── VideoCard.jsx    # ভিডিও কার্ড
-│   └── ShortsCard.jsx   # Shorts কার্ড
-├── pages/
-│   ├── Home.jsx         # হোম ফিড + Shorts + Search
-│   ├── VideoPage.jsx    # ভিডিও প্লেয়ার পেজ
-│   ├── ShortsPage.jsx   # Shorts ভার্টিকাল ফিড
-│   └── Login.jsx        # লগইন/সাইনআপ
-├── context/
-│   └── AuthContext.jsx  # Auth Logic
-└── data/
-    └── mockVideos.js    # Mock Data
+```bash
+cp .env.example .env
+# .env এ বসান:
+VITE_YOUTUBE_API_KEY=AIzaSyD-YOUR-KEY
+VITE_GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
 ```
 
-## 🤖 অ্যান্ড্রয়েড ডেভেলপার হওয়ার জন্য Next Steps
+### Step 4: Run
 
-### এই ওয়েব অ্যাপকে অ্যান্ড্রয়েড অ্যাপে কনভার্ট করার ৩টি উপায়:
+```bash
+npm install
+npm run dev
+# Console এ দেখবে: 🔑 YouTube API Mode: REAL
+```
 
-#### 1. WebView (সবচেয়ে সহজ - Beginner)
-```kotlin
-// Android Studio -> New Project -> Empty Activity
-// activity_main.xml এ WebView যোগ করুন
+**Full Guide:** `GOOGLE_API_SETUP_BN.md` ফাইল দেখো - বাংলায় বিস্তারিত!
 
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        
-        val webView: WebView = findViewById(R.id.webview)
-        webView.settings.javaScriptEnabled = true
-        webView.webViewClient = WebViewClient()
-        webView.loadUrl("https://your-mytube.vercel.app")
-    }
+---
+
+## 🧠 কিভাবে Google Client এর সাথে কথা বলে? (Code Walkthrough)
+
+### 1. `src/services/youtubeApi.js` - YouTube এর সাথে কথা
+
+```javascript
+// Search - Real YouTube Search
+async function searchVideos(query) {
+  // Step 1: Search endpoint
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?
+    part=snippet
+    &q=${query}
+    &type=video
+    &key=${API_KEY}` // API Key দিয়ে Auth
+  
+  const searchRes = await fetch(searchUrl)
+  const searchData = await searchRes.json()
+  // searchData.items = [{id: {videoId: "xyz"}, snippet: {title: "..."}}]
+
+  // Step 2: Details (views, duration, likes) - আলাদা call কারণ search এ views থাকে না
+  const videoIds = searchData.items.map(i => i.id.videoId).join(',')
+  const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?
+    part=contentDetails,statistics,snippet
+    &id=${videoIds}
+    &key=${API_KEY}`
+
+  const detailsRes = await fetch(detailsUrl)
+  // detailsData.items[0].statistics.viewCount = "1234567"
+  // detailsData.items[0].contentDetails.duration = "PT5M30S" (ISO 8601)
+
+  return formattedVideos
 }
 ```
 
-#### 2. Capacitor (Recommended)
-```bash
-npm install @capacitor/core @capacitor/cli @capacitor/android
-npx cap init MyTube com.amin.mytube
-npx cap add android
-npm run build
-npx cap sync
-npx cap open android
+**Quota Cost:**
+- Search: 100 units
+- Videos: 1 unit
+- Comments: 1 unit
+- Daily free: 10,000 units
+
+### 2. `src/services/googleAuth.js` - Google Login এর সাথে কথা
+
+#### A. GSI Load
+```javascript
+// Google Identity Services script load
+<script src="https://accounts.google.com/gsi/client"></script>
+
+await loadGoogleScript()
+google.accounts.id.initialize({
+  client_id: GOOGLE_CLIENT_ID,
+  callback: handleCredentialResponse // Login হলে call হবে
+})
 ```
 
-#### 3. Jetpack Compose + ExoPlayer (Pro - Native YouTube Clone)
-এটি হবে তোমার আসল অ্যান্ড্রয়েড প্রজেক্ট:
-- **UI**: Jetpack Compose
-- **Video**: ExoPlayer / Media3
-- **Shorts**: Vertical ViewPager2
-- **Auth**: Firebase Auth
-- **Backend**: Firebase Firestore + Storage
-- **API**: Retrofit + YouTube Data API v3
+#### B. ID Token (JWT) - User Info
+```javascript
+function handleCredentialResponse(response) {
+  // response.credential = JWT (eyJhbGciOiJSUzI1NiIs...)
+  // JWT = Header.Payload.Signature (Base64)
+  
+  const payload = decodeJwt(response.credential)
+  // payload = {
+  //   sub: "123", // Google User ID
+  //   email: "amin@gmail.com",
+  //   name: "Amin Islam",
+  //   picture: "https://..."
+  // }
 
-### 📚 শেখার রোডম্যাপ (আমিনের জন্য)
-
-**Month 1: Basics**
-- [x] এই MyTube ওয়েব ক্লোন বুঝো (React)
-- [ ] Java/Kotlin Basics
-- [ ] Android Studio Setup
-- [ ] Activity, Fragment, Intent
-
-**Month 2: UI**
-- [ ] XML Layouts / Jetpack Compose
-- [ ] RecyclerView (YouTube এর Video List এর মতো)
-- [ ] ViewPager2 (Shorts এর জন্য)
-
-**Month 3: Advanced**
-- [ ] Retrofit - YouTube API কল করা
-- [ ] ExoPlayer - ভিডিও প্লে করা
-- [ ] Firebase Auth - লগইন
-- [ ] Room Database - Offline videos
-
-**Month 4: MyTube Native**
-- [ ] এই ডিজাইনকে Native Android এ বানাও
-- [ ] Play Store এ পাবলিশ করো!
-
-## 🚀 কিভাবে চালাবে
-
-```bash
-# 1. Install
-npm install
-
-# 2. Run
-npm run dev
-
-# 3. Build
-npm run build
+  // Save user
+  localStorage.setItem('mytube_user', JSON.stringify(user))
+}
 ```
 
-## 🔑 YouTube Data API (Real Data এর জন্য)
-
-যদি Real YouTube ভিডিও দেখাতে চাও:
-
-1. https://console.cloud.google.com এ যাও
-2. YouTube Data API v3 Enable করো
-3. API Key নাও
-4. `.env` ফাইল তৈরি করো:
+#### C. Access Token - YouTube Private Data
+```javascript
+// Like, Subscribe, History এর জন্য Access Token লাগে
+const client = google.accounts.oauth2.initTokenClient({
+  client_id: GOOGLE_CLIENT_ID,
+  scope: "youtube.readonly youtube.force-ssl userinfo.email",
+  callback: (res) => {
+    // res.access_token = ya29.a0AfH6SMB...
+    // এই token দিয়ে:
+    fetch('https://www.googleapis.com/youtube/v3/subscriptions?mine=true', {
+      headers: { Authorization: `Bearer ${res.access_token}` }
+    })
+  }
+})
+client.requestAccessToken() // Popup
 ```
-VITE_YOUTUBE_API_KEY=YOUR_API_KEY
-```
-
-তারপর `src/data/mockVideos.js` এর বদলে API কল করো:
-```js
-fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=android+development&key=${API_KEY}`)
-```
-
-## 🎨 UI Inspiration
-- YouTube.com (Dark Mode)
-- YouTube Mobile App
-- Material Design 3
-
-## 👨‍💻 Author
-**Amin** - Aspiring Android Developer from Bangladesh 🇧🇩
-
-> "একদিন আমি Play Store এ MyTube পাবলিশ করব!"
-
-## 📝 License
-MIT - Free for learning!
 
 ---
-**Made with ❤️ for Amin's Android Developer Journey**
+
+## 📂 নতুন Project Structure
+
+```
+src/
+├── services/
+│   ├── youtubeApi.js      # 🔥 Real YouTube Data API v3
+│   │   ├── searchVideos()         # /search
+│   │   ├── getPopularVideos()     # /videos?chart=mostPopular
+│   │   ├── getVideoDetails()      # /videos?id=
+│   │   ├── getRelatedVideos()     # Related via search
+│   │   ├── getVideoComments()     # /commentThreads
+│   │   ├── getChannelDetails()    # /channels
+│   │   ├── getSearchSuggestions() # suggestqueries.google.com
+│   │   └── getShorts()            # /search?videoDuration=short
+│   │
+│   └── googleAuth.js      # 🔐 Real Google OAuth 2.0
+│       ├── loadGoogleScript()     # GSI load
+│       ├── decodeJwt()            # JWT decode
+│       ├── initGoogleAuth()       # GSI init
+│       ├── signInWithGoogle()     # Popup login
+│       ├── getGoogleAccessToken() # OAuth2 token
+│       └── signOutGoogle()
+│
+├── components/
+│   ├── Header.jsx         # Search + Suggestions + User Menu
+│   ├── Sidebar.jsx        # + API Debugger link
+│   ├── VideoCard.jsx
+│   ├── ShortsCard.jsx
+│   └── ApiSetupBanner.jsx # API Key setup guide banner
+│
+├── pages/
+│   ├── Home.jsx           # Real popular + search + shorts
+│   ├── VideoPage.jsx      # Real details + comments + related + channel
+│   ├── ShortsPage.jsx     # Real shorts
+│   ├── Login.jsx          # Real Google button + JWT debug
+│   └── ApiDebugger.jsx    # 🔧 Live API tester - Raw response দেখো
+│
+├── context/
+│   └── AuthContext.jsx    # Real + Mock dual mode
+│
+└── data/
+    └── mockVideos.js      # Fallback when no API key
+
+server/
+└── index.js               # Express proxy - API Key hide করার জন্য
+
+.env.example               # API Keys template
+GOOGLE_API_SETUP_BN.md     # Full setup guide in Bangla
+```
+
+---
+
+## 🔧 API Debugger (Learning Lab)
+
+`/debug` পেজে যাও:
+
+- Live API call test করতে পারবে
+- Raw JSON response দেখতে পারবে
+- Code snippet দেখতে পারবে
+- Mock vs Real mode status
+
+```
+http://localhost:5173/debug
+```
+
+---
+
+## 🖥️ Backend Proxy (Optional but Pro)
+
+Frontend এ API Key expose করা নিরাপদ নয়। তাই Backend:
+
+```javascript
+// server/index.js
+app.get('/api/search', async (req, res) => {
+  const { q } = req.query
+  // API Key backend .env থেকে, frontend এ যায় না
+  const url = `https://www.googleapis.com/youtube/v3/search?key=${process.env.YOUTUBE_API_KEY}&q=${q}`
+  const data = await fetch(url).then(r => r.json())
+  res.json(data)
+})
+```
+
+Run:
+```bash
+npm run server
+# Frontend .env: VITE_API_BASE_URL=http://localhost:3001
+```
+
+---
+
+## 📱 Android এ Same Logic
+
+### Retrofit (Android)
+```kotlin
+interface YouTubeApi {
+  @GET("search")
+  suspend fun search(
+    @Query("q") q: String,
+    @Query("key") key: String = BuildConfig.YOUTUBE_API_KEY
+  ): SearchResponse
+}
+```
+
+### Google Sign-In (Android)
+```kotlin
+val gso = GoogleSignInOptions.Builder()
+  .requestIdToken(BuildConfig.GOOGLE_CLIENT_ID)
+  .requestEmail()
+  .build()
+
+val credential = GoogleAuthProvider.getCredential(idToken, null)
+auth.signInWithCredential(credential)
+```
+
+**Details:** `android-guide/` ফোল্ডার দেখো
+
+---
+
+## 🚀 Run
+
+```bash
+# 1. Setup env
+cp .env.example .env
+# Edit .env with real keys
+
+# 2. Install
+npm install
+
+# 3. Dev (frontend only)
+npm run dev
+
+# 4. Full stack (frontend + backend proxy)
+npm run server # Terminal 1
+npm run dev    # Terminal 2
+
+# 5. Build
+npm run build
+```
+
+---
+
+## 🎓 আমিনের জন্য Learning Path
+
+**Week 1: API Basics**
+- [x] youtubeApi.js এর প্রতিটা function পড়ো
+- [x] Browser Network tab এ API call দেখো
+- [x] /debug পেজে test করো
+
+**Week 2: Auth**
+- [x] googleAuth.js - JWT কিভাবে decode হয়
+- [x] OAuth 2.0 flow - ID Token vs Access Token
+- [x] Google Cloud Console এ Quota Metrics দেখো
+
+**Week 3: Android**
+- [ ] Retrofit দিয়ে same API call Android এ
+- [ ] ExoPlayer দিয়ে video play
+- [ ] Firebase Auth + Google Sign-In
+
+**Week 4: Publish**
+- [ ] Vercel এ deploy
+- [ ] Play Store এ WebView APK
+
+---
+
+## 📚 Docs
+
+- YouTube Data API: https://developers.google.com/youtube/v3/docs
+- Google Identity: https://developers.google.com/identity/gsi/web
+- OAuth Playground: https://developers.google.com/oauthplayground/
+
+---
+
+**Made with ❤️ for Amin - Now Fully Functional! 🚀**
