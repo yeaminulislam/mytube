@@ -1,0 +1,16 @@
+{
+  "name": "MyTube - ইউটিউব ক্লোন",
+  "short_name": "MyTube",
+  "description": "অ্যান্ড্রয়েড ডেভেলপারদের জন্য ইউটিউব ক্লোন - ভিডিও, শর্টস, সার্চ, লগইন",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#ff0000",
+  "icons": [
+    {
+      "src": "https://www.youtube.com/s/desktop/12d6b690/img/favicon_32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    }
+  ]
+}
