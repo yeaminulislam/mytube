@@ -3,7 +3,6 @@ package com.example.player
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
-import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
@@ -44,7 +43,6 @@ class VideoPlayerController(
 
     // --- Audio focus & wake lock so playback keeps going in the background (Premium-style) ---
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var audioFocusRequest: AudioFocusRequest? = null
     private val wakeLock = (context.getSystemService(Context.POWER_SERVICE) as PowerManager)
         .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyTube:VideoPlayback")
     private var isPausedForBackground = false
@@ -334,31 +332,12 @@ class VideoPlayerController(
         try {
             if (playing) {
                 if (!wakeLock.isHeld) wakeLock.acquire(10 * 60 * 60 * 1000L)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val request = AudioFocusRequest.Builder(AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
-                        .setAudioAttributes(
-                            android.media.AudioAttributes.Builder()
-                                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE)
-                                .build()
-                        )
-                        .setOnAudioFocusChangeListener(audioFocusListener)
-                        .build()
-                    audioManager.requestAudioFocus(request)
-                    audioFocusRequest = request
-                } else {
-                    @Suppress("DEPRECATION")
-                    audioManager.requestAudioFocus(audioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
-                }
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(audioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
             } else {
                 if (wakeLock.isHeld) wakeLock.release()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-                } else {
-                    @Suppress("DEPRECATION")
-                    audioManager.abandonAudioFocus(audioFocusListener)
-                }
-                audioFocusRequest = null
+                @Suppress("DEPRECATION")
+                audioManager.abandonAudioFocus(audioFocusListener)
             }
         } catch (_: Exception) {}
     }
