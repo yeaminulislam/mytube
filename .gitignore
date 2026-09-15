@@ -16,3 +16,11 @@
 local.properties
 .env
 debug.keystore
+
+# Signing material must never be committed.
+*.jks
+*.keystore
+release-keystore.env
+
+# Build output produced by scripts/build-release.sh
+/dist
