@@ -59,10 +59,15 @@ if [ -z "${STORE_PASSWORD:-}" ] && [ -f "$ENV_FILE" ]; then
 fi
 
 if [ ! -f "$KEYSTORE_FILE" ]; then
-  STORE_PASSWORD="${STORE_PASSWORD:-$(openssl rand -hex 16)}"
-  KEY_PASSWORD="${KEY_PASSWORD:-$(openssl rand -hex 16)}"
+  # PKCS12 (the JDK default) has no separate key password: keytool ignores
+  # -keypass and AGP later fails with "Get Key failed: Given final block not
+  # properly padded". Use one password for both, unless the caller overrides.
+  GENERATED_PASSWORD="$(openssl rand -hex 16)"
+  STORE_PASSWORD="${STORE_PASSWORD:-$GENERATED_PASSWORD}"
+  KEY_PASSWORD="${KEY_PASSWORD:-$STORE_PASSWORD}"
   keytool -genkeypair -v \
     -keystore "$KEYSTORE_FILE" \
+    -storetype PKCS12 \
     -alias upload \
     -keyalg RSA -keysize 2048 \
     -validity 10950 \

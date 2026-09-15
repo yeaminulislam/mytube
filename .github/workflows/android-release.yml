@@ -79,19 +79,22 @@ jobs:
             echo "SIGNING_SOURCE=repository-secret" >> "$GITHUB_ENV"
           else
             echo "No KEYSTORE_BASE64 secret found - generating a self-signed key for this build."
-            GENERATED_STORE_PASSWORD="$(openssl rand -hex 16)"
-            GENERATED_KEY_PASSWORD="$(openssl rand -hex 16)"
+            # The JDK default keystore type is PKCS12, which does not support a
+            # separate key password - keytool silently ignores -keypass there and
+            # AGP then fails with "Get Key failed: Given final block not properly
+            # padded". So one password is used for both the store and the key.
+            GENERATED_PASSWORD="$(openssl rand -hex 16)"
             keytool -genkeypair -v \
               -keystore "$KEYSTORE_FILE" \
+              -storetype PKCS12 \
               -alias upload \
               -keyalg RSA -keysize 2048 \
               -validity 10950 \
-              -storepass "$GENERATED_STORE_PASSWORD" \
-              -keypass "$GENERATED_KEY_PASSWORD" \
+              -storepass "$GENERATED_PASSWORD" \
               -dname "CN=MyTube, OU=Mobile, O=MyTube, L=Dhaka, S=Dhaka, C=BD"
             echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
-            echo "STORE_PASSWORD=$GENERATED_STORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "KEY_PASSWORD=$GENERATED_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$GENERATED_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$GENERATED_PASSWORD" >> "$GITHUB_ENV"
             echo "SIGNING_SOURCE=generated-ephemeral" >> "$GITHUB_ENV"
           fi
 
