@@ -112,12 +112,15 @@ jobs:
           set +e
           echo "ANDROID_HOME=${ANDROID_HOME:-unset}  java=$(java -version 2>&1 | head -1)"
           if [ -f build.log ]; then
-            # The most informative part: from "FAILURE: Build failed" onward
-            WHATWENTWRONG="$(sed -n '/^FAILURE: Build failed/,$p' build.log | sed -n '1,80p')"
-            if [ -z "$WHATWENTWRONG" ]; then
-              # Kotlin compile errors appear before the FAILURE block; grab all 'e: ' lines too
-              WHATWENTWRONG="$(grep -E '^e: |^w: .*error|error:' build.log | head -n 60)"
+            # Most informative: the Kotlin compiler error lines themselves
+            E_LINES="$(grep -E '^e: ' build.log | head -n 25)"
+            if [ -n "$E_LINES" ]; then
+              MSG="${E_LINES//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"; MSG="${MSG//$'\r'/'%0D'}"
+              echo "::error title=kotlin-compile-errors::${MSG}"
+              exit 0
             fi
+            # Fallback: from "FAILURE: Build failed" onward
+            WHATWENTWRONG="$(sed -n '/^FAILURE: Build failed/,$p' build.log | sed -n '1,30p')"
             if [ -z "$WHATWENTWRONG" ]; then
               WHATWENTWRONG="$(tail -n 70 build.log)"
             fi
