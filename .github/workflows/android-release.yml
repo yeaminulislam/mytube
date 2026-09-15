@@ -131,6 +131,30 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Signing key used: **${SIGNING_SOURCE}**" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Verify APK signature and manifest
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          REPORT=verify-report.txt
+          : > "$REPORT"
+          for apk in dist/*.apk; do
+            {
+              echo "=== $(basename "$apk") ($(du -h "$apk" | cut -f1)) ==="
+              "$BT/aapt2" dump badging "$apk" | grep -E '^package|^sdkVersion|^targetSdkVersion|^application-label:' || true
+              "$BT/apksigner" verify --verbose --print-certs "$apk" 2>&1 || echo 'apksigner verify FAILED'
+            } >> "$REPORT"
+          done
+          for aab in dist/*.aab; do
+            {
+              echo "=== $(basename "$aab") ($(du -h "$aab" | cut -f1)) ==="
+              echo "bundle: $(unzip -l "$aab" | grep -c 'base/manifest/AndroidManifest.xml' || true) base manifest, $(unzip -l "$aab" | tail -1 | awk '{print $2}') files"
+            } >> "$REPORT"
+          done
+          cat "$REPORT"
+          REPORT_TEXT="$(cat "$REPORT")"
+          MSG="${REPORT_TEXT//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"; MSG="${MSG//$'\r'/'%0D'}"
+          echo "::notice title=artefact-verification::${MSG}"
+
       - name: Upload APK and AAB
         uses: actions/upload-artifact@v4
         with:
