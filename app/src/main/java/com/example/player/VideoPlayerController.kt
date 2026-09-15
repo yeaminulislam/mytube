@@ -335,7 +335,7 @@ class VideoPlayerController(
             if (playing) {
                 if (!wakeLock.isHeld) wakeLock.acquire(10 * 60 * 60 * 1000L)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val request = AudioFocusRequest.Builder(AudioManager.STREAM_MUSIC)
+                    val request = AudioFocusRequest.Builder(AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
                         .setAudioAttributes(
                             android.media.AudioAttributes.Builder()
                                 .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
@@ -343,7 +343,6 @@ class VideoPlayerController(
                                 .build()
                         )
                         .setOnAudioFocusChangeListener(audioFocusListener)
-                        .setRequestType(AudioManager.AUDIOFOCUS_GAIN)
                         .build()
                     audioManager.requestAudioFocus(request)
                     audioFocusRequest = request
