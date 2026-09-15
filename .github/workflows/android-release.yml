@@ -111,12 +111,31 @@ jobs:
         run: |
           set +e
           echo "ANDROID_HOME=${ANDROID_HOME:-unset}  java=$(java -version 2>&1 | head -1)"
-          TAIL="$(tail -n 70 build.log 2>/dev/null)"
-          if [ -z "$TAIL" ]; then
-            TAIL="no build.log - the failure happened before Gradle ran; see the earlier step"
+          if [ -f build.log ]; then
+            # The most informative part: from "FAILURE: Build failed" onward
+            WHATWENTWRONG="$(sed -n '/^FAILURE: Build failed/,$p' build.log | sed -n '1,80p')"
+            if [ -z "$WHATWENTWRONG" ]; then
+              # Kotlin compile errors appear before the FAILURE block; grab all 'e: ' lines too
+              WHATWENTWRONG="$(grep -E '^e: |^w: .*error|error:' build.log | head -n 60)"
+            fi
+            if [ -z "$WHATWENTWRONG" ]; then
+              WHATWENTWRONG="$(tail -n 70 build.log)"
+            fi
+            MSG="${WHATWENTWRONG//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"; MSG="${MSG//$'\r'/'%0D'}"
+            echo "::error title=release-build-failed::${MSG}"
+          else
+            echo "no build.log - the failure happened before Gradle ran; see the earlier step"
           fi
-          MSG="${TAIL//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"; MSG="${MSG//$'\r'/'%0D'}"
-          echo "::error title=release-build-failed::${MSG}"
+
+      - name: Upload build logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-logs-${{ github.run_id }}
+          path: |
+            build.log
+            app/build/outputs/logs/
+          if-no-files-found: ignore
 
       - name: Collect artefacts
         run: |
