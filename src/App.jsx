@@ -7,6 +7,7 @@ import VideoPage from './pages/VideoPage';
 import ShortsPage from './pages/ShortsPage';
 import Login from './pages/Login';
 import ApiDebugger from './pages/ApiDebugger';
+import InstallPage from './pages/InstallPage';
 import { AuthProvider } from './context/AuthContext';
 
 function AppContent() {
@@ -56,13 +57,15 @@ function AppContent() {
             <Route path="/shorts" element={<ShortsPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/debug" element={<ApiDebugger />} />
+            <Route path="/install" element={<InstallPage />} />
             <Route path="*" element={
               <div className="flex items-center justify-center h-[calc(100vh-56px)] flex-col gap-4 p-6 text-center">
                 <p className="text-6xl">🚧</p>
                 <p className="text-xl">এই পেজটি শীঘ্রই আসছে!</p>
                 <p className="text-[#aaa]">আমিন, এটি তোমার পরবর্তী ফিচার হতে পারে।</p>
-                <div className="flex gap-2 mt-4">
+                <div className="flex gap-2 mt-4 flex-wrap justify-center">
                   <a href="/" className="bg-white text-black px-6 py-2 rounded-full font-medium">হোমে ফিরুন</a>
+                  <a href="/install" className="bg-red-600 text-white px-6 py-2 rounded-full font-medium">📱 ফোনে ইন্সটল</a>
                   <a href="/debug" className="bg-[#272727] text-white px-6 py-2 rounded-full font-medium">🔧 API Debugger</a>
                 </div>
               </div>

@@ -1,0 +1,16 @@
+{
+  "appId": "com.amin.mytube",
+  "appName": "MyTube",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0f0f0f"
+    }
+  }
+}

@@ -16,6 +16,7 @@ export default function Sidebar({ collapsed }) {
     { icon: "⏰", label: "পরে দেখুন", path: "/watch-later" },
     { icon: "👍", label: "পছন্দ করা ভিডিও", path: "/liked" },
     { divider: true },
+    { icon: "📱", label: "ফোনে ইন্সটল করুন", path: "/install", section: "ইন্সটল" },
     { icon: "🔥", label: "ট্রেন্ডিং", path: "/trending", section: "এক্সপ্লোর" },
     { icon: "🛍️", label: "শপিং", path: "/shopping" },
     { icon: "🎵", label: "মিউজিক", path: "/music" },

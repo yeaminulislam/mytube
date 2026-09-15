@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import VideoCard from '../components/VideoCard';
 import ShortsCard from '../components/ShortsCard';
 import ApiSetupBanner from '../components/ApiSetupBanner';
+import InstallPrompt from '../components/InstallPrompt';
 import { categories } from '../data/mockVideos';
 import { searchVideos, getPopularVideos, getShorts, apiStatus } from '../services/youtubeApi';
 
@@ -89,6 +90,9 @@ export default function Home({ searchQuery }) {
 
   return (
     <div className="flex-1 bg-[#0f0f0f] min-h-[calc(100vh-56px)]">
+      {/* PWA Install Prompt - ফোনে ইন্সটল করার জন্য */}
+      <InstallPrompt />
+      
       {/* API Status Banner */}
       <ApiSetupBanner />
 

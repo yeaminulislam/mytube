@@ -1,16 +1,80 @@
 {
   "name": "MyTube - ইউটিউব ক্লোন",
   "short_name": "MyTube",
-  "description": "অ্যান্ড্রয়েড ডেভেলপারদের জন্য ইউটিউব ক্লোন - ভিডিও, শর্টস, সার্চ, লগইন",
+  "description": "অ্যান্ড্রয়েড ডেভেলপারদের জন্য ফুল ফাংশনাল ইউটিউব ক্লোন - ভিডিও, শর্টস, সার্চ, লগইন - Real YouTube API",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "any",
   "background_color": "#0f0f0f",
   "theme_color": "#ff0000",
+  "categories": ["video", "entertainment", "education"],
+  "lang": "bn",
+  "dir": "ltr",
   "icons": [
     {
       "src": "https://www.youtube.com/s/desktop/12d6b690/img/favicon_32x32.png",
       "sizes": "32x32",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://www.youtube.com/s/desktop/12d6b690/img/favicon_48x48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://www.youtube.com/s/desktop/12d6b690/img/favicon_144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://www.youtube.com/img/desktop/supported_browsers/yt_logo_rgb_light.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://www.youtube.com/img/desktop/supported_browsers/yt_logo_rgb_light.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "সার্চ",
+      "short_name": "সার্চ",
+      "description": "ভিডিও সার্চ করুন",
+      "url": "/?q=android",
+      "icons": [{ "src": "https://www.youtube.com/s/desktop/12d6b690/img/favicon_32x32.png", "sizes": "32x32" }]
+    },
+    {
+      "name": "Shorts",
+      "short_name": "Shorts",
+      "description": "YouTube Shorts দেখুন",
+      "url": "/shorts",
+      "icons": [{ "src": "https://www.youtube.com/s/desktop/12d6b690/img/favicon_32x32.png", "sizes": "32x32" }]
+    },
+    {
+      "name": "API Debugger",
+      "short_name": "Debug",
+      "description": "API Test করুন",
+      "url": "/debug",
+      "icons": [{ "src": "https://www.youtube.com/s/desktop/12d6b690/img/favicon_32x32.png", "sizes": "32x32" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }
