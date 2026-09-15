@@ -863,14 +863,13 @@ private fun openInYouTube(context: android.content.Context, video: VideoItem) {
         uri.getQueryParameter("v") ?: return
     }
     val url = "https://www.youtube.com/watch?v=$videoId"
+    // Plain ACTION_VIEW: the system offers the installed apps that can open it
+    // (the real YouTube app first when installed, otherwise a browser).
+    // No package query / resolveActivity — those are restricted on modern Android.
     try {
-        val appIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url), "com.google.android.youtube")
-        if (appIntent.resolveActivity(context.packageManager) != null) {
-            context.startActivity(appIntent)
-            return
-        }
-    } catch (_: Exception) {}
-    try {
-        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
     } catch (_: Exception) {}
 }
