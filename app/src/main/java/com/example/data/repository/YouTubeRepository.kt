@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import android.content.SharedPreferences
 import com.example.data.SampleData
 import com.example.data.local.CustomPlaylistEntity
 import com.example.data.local.OfflineVideoEntity
@@ -17,13 +18,17 @@ import com.example.ui.theme.AppThemePresets
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
 import java.util.UUID
 
 enum class BellNotificationMode {
     ALL, PERSONALIZED, NONE
 }
 
-class YouTubeRepository(private val dao: YouTubeDao) {
+class YouTubeRepository(
+    private val dao: YouTubeDao,
+    private val prefs: SharedPreferences
+) {
 
     private val _videos = MutableStateFlow<List<VideoItem>>(SampleData.sampleVideos)
     val videos: Flow<List<VideoItem>> = _videos.asStateFlow()
@@ -34,35 +39,38 @@ class YouTubeRepository(private val dao: YouTubeDao) {
     private val _communityPosts = MutableStateFlow<List<CommunityPost>>(SampleData.sampleCommunityPosts)
     val communityPosts: Flow<List<CommunityPost>> = _communityPosts.asStateFlow()
 
-    private val _currentAccount = MutableStateFlow<GoogleAccount?>(null)
+    // --- Persisted state (survives app restarts via SharedPreferences) ---
+
+    private val _currentAccount = MutableStateFlow<GoogleAccount?>(loadAccount())
     val currentAccount = _currentAccount.asStateFlow()
 
-    private val _subscribedChannels = MutableStateFlow<Map<String, BellNotificationMode>>(emptyMap())
+    private val _subscribedChannels = MutableStateFlow<Map<String, BellNotificationMode>>(loadSubscriptions())
     val subscribedChannels = _subscribedChannels.asStateFlow()
 
-    private val _likedVideoIds = MutableStateFlow<Set<String>>(emptySet())
+    private val _likedVideoIds = MutableStateFlow<Set<String>>(loadIdSet(PREF_LIKED))
     val likedVideoIds = _likedVideoIds.asStateFlow()
 
-    private val _dislikedVideoIds = MutableStateFlow<Set<String>>(emptySet())
+    private val _dislikedVideoIds = MutableStateFlow<Set<String>>(loadIdSet(PREF_DISLIKED))
     val dislikedVideoIds = _dislikedVideoIds.asStateFlow()
 
-    private val _isAmbientModeEnabled = MutableStateFlow(true)
+    private val _isAmbientModeEnabled = MutableStateFlow(prefs.getBoolean(PREF_AMBIENT, true))
     val isAmbientModeEnabled = _isAmbientModeEnabled.asStateFlow()
 
-    private val _isBackgroundPlaybackEnabled = MutableStateFlow(true)
+    private val _isBackgroundPlaybackEnabled = MutableStateFlow(prefs.getBoolean(PREF_BACKGROUND_PLAYBACK, true))
     val isBackgroundPlaybackEnabled = _isBackgroundPlaybackEnabled.asStateFlow()
 
-    private val _isRestrictedModeEnabled = MutableStateFlow(false)
+    private val _isRestrictedModeEnabled = MutableStateFlow(prefs.getBoolean(PREF_RESTRICTED, false))
     val isRestrictedModeEnabled = _isRestrictedModeEnabled.asStateFlow()
 
     private val _isAdFreePremiumEnabled = MutableStateFlow(true)
     val isAdFreePremiumEnabled = _isAdFreePremiumEnabled.asStateFlow()
 
-    private val _currentTheme = MutableStateFlow<AppThemePreset>(AppThemePresets.GreenBlack)
+    private val _currentTheme = MutableStateFlow<AppThemePreset>(loadTheme())
     val currentTheme = _currentTheme.asStateFlow()
 
     fun setTheme(preset: AppThemePreset) {
         _currentTheme.value = preset
+        prefs.edit().putString(PREF_THEME, preset.id).apply()
     }
 
     private val _joinedMemberships = MutableStateFlow<Set<String>>(emptySet())
@@ -77,10 +85,12 @@ class YouTubeRepository(private val dao: YouTubeDao) {
     // Google Sign-In Actions
     fun signInWithGoogle(account: GoogleAccount) {
         _currentAccount.value = account
+        saveAccount(account)
     }
 
     fun signOut() {
         _currentAccount.value = null
+        prefs.edit().remove(PREF_ACCOUNT).apply()
     }
 
     suspend fun searchOnlineVideos(query: String): List<VideoItem> {
@@ -130,22 +140,24 @@ class YouTubeRepository(private val dao: YouTubeDao) {
     // Likes & Dislikes
     fun toggleLike(videoId: String) {
         val current = _likedVideoIds.value
-        if (current.contains(videoId)) {
-            _likedVideoIds.value = current - videoId
-        } else {
-            _likedVideoIds.value = current + videoId
+        val next = if (current.contains(videoId)) current - videoId else current + videoId
+        _likedVideoIds.value = next
+        if (next.contains(videoId)) {
             _dislikedVideoIds.value = _dislikedVideoIds.value - videoId
         }
+        saveIdSet(PREF_LIKED, next)
+        saveIdSet(PREF_DISLIKED, _dislikedVideoIds.value)
     }
 
     fun toggleDislike(videoId: String) {
         val current = _dislikedVideoIds.value
-        if (current.contains(videoId)) {
-            _dislikedVideoIds.value = current - videoId
-        } else {
-            _dislikedVideoIds.value = current + videoId
+        val next = if (current.contains(videoId)) current - videoId else current + videoId
+        _dislikedVideoIds.value = next
+        if (next.contains(videoId)) {
             _likedVideoIds.value = _likedVideoIds.value - videoId
         }
+        saveIdSet(PREF_DISLIKED, next)
+        saveIdSet(PREF_LIKED, _likedVideoIds.value)
     }
 
     // Subscription & Bell notification
@@ -157,12 +169,14 @@ class YouTubeRepository(private val dao: YouTubeDao) {
             map[channelId] = BellNotificationMode.ALL
         }
         _subscribedChannels.value = map
+        saveSubscriptions(map)
     }
 
     fun setBellNotification(channelId: String, mode: BellNotificationMode) {
         val map = _subscribedChannels.value.toMutableMap()
         map[channelId] = mode
         _subscribedChannels.value = map
+        saveSubscriptions(map)
     }
 
     fun toggleMembership(channelId: String) {
@@ -279,13 +293,96 @@ class YouTubeRepository(private val dao: YouTubeDao) {
     // Settings
     fun toggleAmbientMode() {
         _isAmbientModeEnabled.value = !_isAmbientModeEnabled.value
+        prefs.edit().putBoolean(PREF_AMBIENT, _isAmbientModeEnabled.value).apply()
     }
 
     fun toggleBackgroundPlayback() {
         _isBackgroundPlaybackEnabled.value = !_isBackgroundPlaybackEnabled.value
+        prefs.edit().putBoolean(PREF_BACKGROUND_PLAYBACK, _isBackgroundPlaybackEnabled.value).apply()
     }
 
     fun toggleRestrictedMode() {
         _isRestrictedModeEnabled.value = !_isRestrictedModeEnabled.value
+        prefs.edit().putBoolean(PREF_RESTRICTED, _isRestrictedModeEnabled.value).apply()
+    }
+
+    // --- Persistence helpers ---
+
+    private fun loadTheme(): AppThemePreset {
+        val id = prefs.getString(PREF_THEME, null)
+        return AppThemePresets.allPresets.firstOrNull { it.id == id } ?: AppThemePresets.GreenBlack
+    }
+
+    private fun loadIdSet(key: String): Set<String> {
+        val raw = prefs.getString(key, null) ?: return emptySet()
+        return raw.split(",").filter { it.isNotBlank() }.toSet()
+    }
+
+    private fun saveIdSet(key: String, ids: Set<String>) {
+        prefs.edit().putString(key, ids.joinToString(",")).apply()
+    }
+
+    private fun loadSubscriptions(): Map<String, BellNotificationMode> {
+        val raw = prefs.getString(PREF_SUBSCRIPTIONS, null) ?: return emptyMap()
+        return try {
+            val obj = JSONObject(raw)
+            val map = mutableMapOf<String, BellNotificationMode>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val mode = runCatching { BellNotificationMode.valueOf(obj.getString(key)) }.getOrNull()
+                if (mode != null) map[key] = mode
+            }
+            map
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    private fun saveSubscriptions(map: Map<String, BellNotificationMode>) {
+        val obj = JSONObject()
+        map.forEach { (channelId, mode) -> obj.put(channelId, mode.name) }
+        prefs.edit().putString(PREF_SUBSCRIPTIONS, obj.toString()).apply()
+    }
+
+    private fun loadAccount(): GoogleAccount? {
+        val raw = prefs.getString(PREF_ACCOUNT, null) ?: return null
+        return try {
+            val obj = JSONObject(raw)
+            GoogleAccount(
+                id = obj.optString("id"),
+                displayName = obj.optString("displayName"),
+                email = obj.optString("email"),
+                avatarUrl = obj.optString("avatarUrl"),
+                channelHandle = obj.optString("channelHandle"),
+                isPremium = obj.optBoolean("isPremium", false)
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun saveAccount(account: GoogleAccount) {
+        try {
+            val obj = JSONObject()
+                .put("id", account.id)
+                .put("displayName", account.displayName)
+                .put("email", account.email)
+                .put("avatarUrl", account.avatarUrl)
+                .put("channelHandle", account.channelHandle)
+                .put("isPremium", account.isPremium)
+            prefs.edit().putString(PREF_ACCOUNT, obj.toString()).apply()
+        } catch (_: Exception) {}
+    }
+
+    companion object {
+        private const val PREF_THEME = "pref_theme"
+        private const val PREF_LIKED = "pref_liked_videos"
+        private const val PREF_DISLIKED = "pref_disliked_videos"
+        private const val PREF_SUBSCRIPTIONS = "pref_subscriptions"
+        private const val PREF_AMBIENT = "pref_ambient_mode"
+        private const val PREF_BACKGROUND_PLAYBACK = "pref_background_playback"
+        private const val PREF_RESTRICTED = "pref_restricted_mode"
+        private const val PREF_ACCOUNT = "pref_google_account"
     }
 }

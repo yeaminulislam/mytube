@@ -2,6 +2,16 @@ package com.example.model
 
 import androidx.compose.ui.graphics.Color
 
+/**
+ * Returns true when the video is a real YouTube video (watch URL or 11-char YouTube id)
+ * and therefore must be played through the WebView/YouTube IFrame engine,
+ * while plain MP4/HLS links can be played with the native MediaPlayer.
+ */
+fun isYouTubeVideo(video: VideoItem): Boolean =
+    video.videoUrl.contains("youtube.com", ignoreCase = true) ||
+        video.videoUrl.contains("youtu.be", ignoreCase = true) ||
+        video.id.length == 11
+
 data class Chapter(
     val title: String,
     val startSecond: Int

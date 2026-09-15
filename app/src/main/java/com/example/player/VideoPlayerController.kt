@@ -3,15 +3,20 @@ package com.example.player
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
+import android.os.Looper
+import android.os.PowerManager
 import android.util.Rational
 import android.view.Surface
-import androidx.compose.ui.graphics.Color
+import android.webkit.WebView
 import com.example.model.Chapter
 import com.example.model.VideoItem
 import com.example.model.VideoQuality
+import com.example.model.isYouTubeVideo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,6 +34,31 @@ class VideoPlayerController(
     private var mediaPlayer: MediaPlayer? = null
     private var positionTrackerJob: Job? = null
     private var currentSurface: Surface? = null
+
+    /**
+     * Hook used to drive the real YouTube IFrame player that runs inside the WebView.
+     * Set by [attachWebEngine] while the player overlay is composed, cleared by [detachWebEngine].
+     */
+    var webCommandSink: ((js: String) -> Unit)? = null
+        private set
+
+    // --- Audio focus & wake lock so playback keeps going in the background (Premium-style) ---
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private val wakeLock = (context.getSystemService(Context.POWER_SERVICE) as PowerManager)
+        .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyTube:VideoPlayback")
+    private var isPausedForBackground = false
+
+    private val audioFocusListener = object : AudioManager.OnAudioFocusChangeListener {
+        override fun onAudioFocusChange(focusChange: Int) {
+            when (focusChange) {
+                AudioManager.AUDIOFOCUS_LOSS,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pauseForBackground()
+
+                AudioManager.AUDIOFOCUS_GAIN -> resumeFromBackground()
+            }
+        }
+    }
 
     val playerState = MutableStateFlow(PlayerState())
 
@@ -50,7 +80,26 @@ class VideoPlayerController(
         }
     }
 
+    /** Registers the WebView that hosts the YouTube IFrame player for the current video. */
+    fun attachWebEngine(webView: WebView) {
+        webCommandSink = { js ->
+            try {
+                if (Looper.myLooper() != Looper.getMainLooper()) {
+                    webView.post { webView.evaluateJavascript(js, null) }
+                } else {
+                    webView.evaluateJavascript(js, null)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    /** Clears the WebView engine (player overlay removed / video closed). */
+    fun detachWebEngine() {
+        webCommandSink = null
+    }
+
     fun closePlayer() {
+        detachWebEngine()
         releasePlayer()
         playerState.update {
             it.copy(
@@ -75,7 +124,13 @@ class VideoPlayerController(
                 isAudioOnlyMode = false
             )
         }
-        initMediaPlayer(video)
+        isPausedForBackground = false
+        if (!isYouTubeVideo(video)) {
+            // Only plain MP4/HLS links need a native MediaPlayer.
+            // YouTube videos are driven by the WebView IFrame engine instead.
+            initMediaPlayer(video)
+        }
+        updatePlaybackLocks(true)
         startPositionTracker()
     }
 
@@ -101,6 +156,7 @@ class VideoPlayerController(
                 }
                 setOnCompletionListener {
                     playerState.update { it.copy(isPlaying = false, currentPositionMs = it.durationMs) }
+                    updatePlaybackLocks(false)
                 }
                 setOnErrorListener { _, _, _ ->
                     // Fallback to synthetic duration tracking
@@ -116,19 +172,29 @@ class VideoPlayerController(
 
     fun playPause() {
         val currentlyPlaying = playerState.value.isPlaying
-        if (currentlyPlaying) {
+        if (webCommandSink != null) {
+            // YouTube IFrame engine — send the command, state comes back via onEvent.
+            webCommandSink!!.invoke(if (currentlyPlaying) "ytPause()" else "ytPlay()")
+        } else if (currentlyPlaying) {
             mediaPlayer?.pause()
         } else {
             mediaPlayer?.start()
         }
-        playerState.update { it.copy(isPlaying = !currentlyPlaying) }
+        if (webCommandSink == null) {
+            playerState.update { it.copy(isPlaying = !currentlyPlaying) }
+        }
+        updatePlaybackLocks(!currentlyPlaying)
     }
 
     fun seekTo(positionMs: Long) {
         val clamped = positionMs.coerceIn(0, playerState.value.durationMs)
-        try {
-            mediaPlayer?.seekTo(clamped.toInt())
-        } catch (_: Exception) {}
+        if (webCommandSink != null) {
+            webCommandSink!!.invoke("ytSeek(${clamped / 1000})")
+        } else {
+            try {
+                mediaPlayer?.seekTo(clamped.toInt())
+            } catch (_: Exception) {}
+        }
         playerState.update { it.copy(currentPositionMs = clamped) }
         updateSubtitles(clamped)
     }
@@ -140,16 +206,38 @@ class VideoPlayerController(
     }
 
     fun setPlaybackSpeed(speed: Float) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                mediaPlayer?.let {
-                    val params = it.playbackParams
-                    params.speed = speed
-                    it.playbackParams = params
+        if (webCommandSink != null) {
+            webCommandSink!!.invoke("ytSpeed($speed)")
+        } else {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    mediaPlayer?.let {
+                        val params = it.playbackParams
+                        params.speed = speed
+                        it.playbackParams = params
+                    }
                 }
-            }
-        } catch (_: Exception) {}
+            } catch (_: Exception) {}
+        }
         playerState.update { it.copy(playbackSpeed = speed) }
+    }
+
+    /**
+     * Called from the WebView JS bridge with the real IFrame player state:
+     * [timeMs] current position, [durationMs] duration, [playing] whether it is playing/buffering.
+     */
+    fun reportWebPlayback(timeMs: Long, durationMs: Long, playing: Boolean) {
+        val wasPlaying = playerState.value.isPlaying
+        playerState.update {
+            val duration = if (durationMs > 0) durationMs else it.durationMs
+            it.copy(
+                currentPositionMs = if (duration > 0) timeMs.coerceIn(0, duration) else timeMs,
+                durationMs = duration,
+                isPlaying = playing
+            )
+        }
+        if (playing != wasPlaying) updatePlaybackLocks(playing)
+        updateSubtitles(playerState.value.currentPositionMs)
     }
 
     fun setQuality(quality: VideoQuality) {
@@ -210,6 +298,72 @@ class VideoPlayerController(
         }
     }
 
+    // --- Background playback (app minimized / screen off) ---
+
+    /** Pauses playback when the app goes to background and background playback is disabled. */
+    fun pauseForBackground() {
+        if (!playerState.value.isPlaying) return
+        isPausedForBackground = true
+        if (webCommandSink != null) {
+            webCommandSink!!.invoke("ytPause()")
+        } else {
+            try {
+                mediaPlayer?.pause()
+            } catch (_: Exception) {}
+        }
+        playerState.update { it.copy(isPlaying = false) }
+        updatePlaybackLocks(false)
+    }
+
+    /** Resumes playback that was paused for backgrounding, once the app is visible again. */
+    fun resumeFromBackground() {
+        if (!isPausedForBackground) return
+        isPausedForBackground = false
+        if (webCommandSink != null) {
+            webCommandSink!!.invoke("ytPlay()")
+        } else {
+            try {
+                mediaPlayer?.start()
+            } catch (_: Exception) {}
+        }
+        playerState.update { it.copy(isPlaying = true) }
+        updatePlaybackLocks(true)
+    }
+
+    private fun updatePlaybackLocks(playing: Boolean) {
+        try {
+            if (playing) {
+                if (!wakeLock.isHeld) wakeLock.acquire(10 * 60 * 60 * 1000L)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val request = AudioFocusRequest.Builder(AudioManager.STREAM_MUSIC)
+                        .setAudioAttributes(
+                            android.media.AudioAttributes.Builder()
+                                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE)
+                                .build()
+                        )
+                        .setOnAudioFocusChangeListener(audioFocusListener)
+                        .setRequestType(AudioManager.AUDIOFOCUS_GAIN)
+                        .build()
+                    audioManager.requestAudioFocus(request)
+                    audioFocusRequest = request
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.requestAudioFocus(audioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+                }
+            } else {
+                if (wakeLock.isHeld) wakeLock.release()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.abandonAudioFocus(audioFocusListener)
+                }
+                audioFocusRequest = null
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun showGestureFeedback(feedback: GestureFeedback) {
         playerState.update { it.copy(gestureFeedback = feedback) }
         scope.launch {
@@ -225,6 +379,11 @@ class VideoPlayerController(
         positionTrackerJob = scope.launch(Dispatchers.Main) {
             while (isActive) {
                 if (playerState.value.isPlaying) {
+                    if (webCommandSink != null) {
+                        // YouTube videos: position is reported by the WebView bridge instead.
+                        delay(500)
+                        continue
+                    }
                     val current = try {
                         mediaPlayer?.currentPosition?.toLong() ?: (playerState.value.currentPositionMs + 500)
                     } catch (e: Exception) {
@@ -265,5 +424,6 @@ class VideoPlayerController(
             mediaPlayer?.release()
         } catch (_: Exception) {}
         mediaPlayer = null
+        updatePlaybackLocks(false)
     }
 }

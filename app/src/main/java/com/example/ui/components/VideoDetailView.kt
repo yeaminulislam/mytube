@@ -67,6 +67,7 @@ import coil.compose.AsyncImage
 import com.example.data.SampleData
 import com.example.data.repository.BellNotificationMode
 import com.example.model.CommentItem
+import com.example.model.GoogleAccount
 import com.example.model.VideoItem
 import com.example.player.PlayerState
 import com.example.ui.theme.YouTubeDarkBorder
@@ -78,6 +79,7 @@ import com.example.ui.theme.YouTubeRed
 fun VideoDetailView(
     video: VideoItem,
     playerState: PlayerState,
+    currentAccount: GoogleAccount?,
     isLiked: Boolean,
     isDisliked: Boolean,
     isSubscribed: Boolean,
@@ -88,8 +90,8 @@ fun VideoDetailView(
     onDislikeToggle: () -> Unit,
     onSubscribeToggle: () -> Unit,
     onBellModeChange: (BellNotificationMode) -> Unit,
-    onDownloadClick: () -> Unit,
-    onWatchLaterToggle: () -> Unit,
+    onDownloadClick: (VideoItem) -> Unit,
+    onWatchLaterToggle: (VideoItem) -> Unit,
     onOpenComments: () -> Unit,
     onChannelClick: () -> Unit,
     onSelectRecommendedVideo: (VideoItem) -> Unit,
@@ -160,6 +162,12 @@ fun VideoDetailView(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+
+        // Live Chat for LIVE streams
+        if (video.isLive) {
+            Spacer(modifier = Modifier.height(14.dp))
+            LiveStreamChatView(currentAccount = currentAccount)
         }
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -363,7 +371,7 @@ fun VideoDetailView(
                 icon = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
                 text = if (isDownloaded) "Downloaded" else "Download",
                 tint = if (isDownloaded) YouTubePremiumGold else Color.White,
-                onClick = onDownloadClick
+                onClick = { onDownloadClick(video) }
             )
 
             // Watch Later Button
@@ -371,7 +379,7 @@ fun VideoDetailView(
                 icon = Icons.Default.WatchLater,
                 text = if (isWatchLater) "Saved" else "Watch Later",
                 tint = if (isWatchLater) Color(0xFF3EA6FF) else Color.White,
-                onClick = onWatchLaterToggle
+                onClick = { onWatchLaterToggle(video) }
             )
 
             // Remix / Clip
@@ -477,8 +485,9 @@ fun VideoDetailView(
             VideoCard(
                 video = recVideo,
                 onClick = { onSelectRecommendedVideo(recVideo) },
-                onSaveWatchLater = onWatchLaterToggle,
-                onDownload = onDownloadClick,
+                // Each recommended card acts on ITS OWN video (not the current one)
+                onSaveWatchLater = { onWatchLaterToggle(recVideo) },
+                onDownload = { onDownloadClick(recVideo) },
                 onShare = {},
                 onChannelClick = onChannelClick
             )

@@ -50,11 +50,13 @@ object YouTubeApiService {
     suspend fun fetchCategoryVideos(category: String): List<VideoItem> = withContext(Dispatchers.IO) {
         val query = when (category.lowercase()) {
             "all" -> "popular trending videos"
+            "trending" -> "trending videos"
             "music" -> "top trending music official video"
             "gaming" -> "popular gaming gameplay"
             "tech" -> "tech gadgets smartphone review"
             "coding" -> "coding tutorial android kotlin"
             "bangla" -> "popular bangla song drama natok"
+            "news" -> "latest breaking news"
             "shorts" -> "viral youtube shorts"
             else -> "$category trending"
         }

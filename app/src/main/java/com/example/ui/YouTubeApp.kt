@@ -401,18 +401,18 @@ fun YouTubeApp(
                         onToggleBackgroundPlayback = { repository.toggleBackgroundPlayback() },
                         onToggleRestrictedMode = { repository.toggleRestrictedMode() },
                         onPlayHistoryVideo = { hist ->
-                            val match = videos.firstOrNull { it.id == hist.videoId } ?: videos.firstOrNull()
-                            if (match != null) {
-                                playerController.setVideo(match)
-                                isPlayerMinimized = false
-                            }
+                            // Use the exact stored video; only fall back to rebuilding it
+                            // when it is no longer in the current feed (e.g. app restarted).
+                            val video = videos.firstOrNull { it.id == hist.videoId }
+                                ?: buildVideoFromRecord(hist.videoId, hist.title, hist.channelName, hist.thumbnailUrl, hist.durationSeconds)
+                            playerController.setVideo(video)
+                            isPlayerMinimized = false
                         },
                         onPlayOfflineVideo = { off ->
-                            val match = videos.firstOrNull { it.id == off.videoId } ?: videos.firstOrNull()
-                            if (match != null) {
-                                playerController.setVideo(match)
-                                isPlayerMinimized = false
-                            }
+                            val video = videos.firstOrNull { it.id == off.videoId }
+                                ?: buildVideoFromRecord(off.videoId, off.title, off.channelName, off.thumbnailUrl, off.durationSeconds)
+                            playerController.setVideo(video)
+                            isPlayerMinimized = false
                         }
                     )
                 }
@@ -445,6 +445,7 @@ fun YouTubeApp(
                     VideoDetailView(
                         video = currentVideo,
                         playerState = playerState,
+                        currentAccount = currentAccount,
                         isLiked = isLiked,
                         isDisliked = isDisliked,
                         isSubscribed = isSubscribed,
@@ -455,15 +456,15 @@ fun YouTubeApp(
                         onDislikeToggle = { repository.toggleDislike(currentVideo.id) },
                         onSubscribeToggle = { repository.toggleSubscription(currentVideo.channelId) },
                         onBellModeChange = { mode -> repository.setBellNotification(currentVideo.channelId, mode) },
-                        onDownloadClick = {
+                        onDownloadClick = { targetVideo ->
                             scope.launch {
-                                repository.downloadVideo(currentVideo)
+                                repository.downloadVideo(targetVideo)
                                 Toast.makeText(context, "Saved for offline playback in Room DB", Toast.LENGTH_SHORT).show()
                             }
                         },
-                        onWatchLaterToggle = {
+                        onWatchLaterToggle = { targetVideo ->
                             scope.launch {
-                                repository.toggleWatchLater(currentVideo)
+                                repository.toggleWatchLater(targetVideo)
                                 Toast.makeText(context, "Updated Watch Later", Toast.LENGTH_SHORT).show()
                             }
                         },
@@ -560,3 +561,34 @@ private fun navItemColors(theme: AppThemePreset) = NavigationBarItemDefaults.col
     unselectedTextColor = theme.onSurfaceVariant,
     indicatorColor = theme.primary.copy(alpha = 0.15f)
 )
+
+/**
+ * Rebuilds a playable VideoItem from a saved history / download row so the CORRECT video
+ * plays even if it is no longer part of the current feed (e.g. after an app restart).
+ */
+private fun buildVideoFromRecord(
+    videoId: String,
+    title: String,
+    channelName: String,
+    thumbnailUrl: String,
+    durationSeconds: Int
+): VideoItem {
+    val isYouTubeId = videoId.length == 11
+    return VideoItem(
+        id = videoId,
+        title = title,
+        description = "Playing from saved history",
+        channelId = "history_channel",
+        channelName = channelName,
+        channelAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        subscriberCount = "—",
+        thumbnailUrl = thumbnailUrl,
+        videoUrl = if (isYouTubeId) "https://www.youtube.com/watch?v=$videoId" else "",
+        durationSeconds = durationSeconds,
+        viewCount = 0,
+        uploadDateText = "Watched",
+        likesCount = 0,
+        dislikesCount = 0,
+        category = "History"
+    )
+}

@@ -202,9 +202,10 @@ fun VideoCard(
 }
 
 private fun formatDuration(seconds: Int): String {
-    val m = seconds / 60
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
     val s = seconds % 60
-    return String.format("%02d:%02d", m, s)
+    return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
 }
 
 private fun formatViews(views: Long): String {
