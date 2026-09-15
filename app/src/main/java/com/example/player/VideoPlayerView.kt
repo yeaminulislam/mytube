@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayArrow
@@ -196,6 +197,9 @@ fun VideoPlayerView(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        // Standard mobile Chrome UA — some embed player configs
+                        // (e.g. "Error 153") fail with the generic WebView UA
+                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.mediaPlaybackRequiresUserGesture = false
@@ -208,6 +212,25 @@ fun VideoPlayerView(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+
+            // "Open in YouTube" — fallback when the embed player can't play this video
+            // (e.g. the owner disabled embedding). Opens the real YouTube app, or a browser.
+            IconButton(
+                onClick = { openInYouTube(context, video) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .testTag("open_in_youtube_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.OpenInNew,
+                    contentDescription = "Open in YouTube app",
+                    tint = Color.White
+                )
+            }
         } else {
             // Direct MP4 / HLS Video Surface via TextureView (decodes and displays video stream)
             AndroidView(
@@ -828,4 +851,26 @@ private fun formatTime(seconds: Long): String {
     val m = (seconds % 3600) / 60
     val s = seconds % 60
     return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
+}
+
+/**
+ * Opens the video in the real YouTube app (preferred) or a browser as a fallback.
+ * Used when the in-app embed player cannot play a video (e.g. embedding disabled).
+ */
+private fun openInYouTube(context: android.content.Context, video: VideoItem) {
+    val videoId = if (video.id.length == 11) video.id else {
+        val uri = android.net.Uri.parse(video.videoUrl)
+        uri.getQueryParameter("v") ?: return
+    }
+    val url = "https://www.youtube.com/watch?v=$videoId"
+    try {
+        val appIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url), "com.google.android.youtube")
+        if (appIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(appIntent)
+            return
+        }
+    } catch (_: Exception) {}
+    try {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+    } catch (_: Exception) {}
 }

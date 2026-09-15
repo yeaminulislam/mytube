@@ -3,6 +3,7 @@ package com.example
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
@@ -13,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.data.local.YouTubeDatabase
 import com.example.data.repository.YouTubeRepository
 import com.example.player.VideoPlayerController
+import com.example.ui.AppUiState
 import com.example.ui.YouTubeApp
 import com.example.ui.theme.MyApplicationTheme
 
@@ -20,6 +22,7 @@ class MainActivity : ComponentActivity() {
 
   private lateinit var playerController: VideoPlayerController
   private lateinit var repository: YouTubeRepository
+  private lateinit var uiState: AppUiState
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -31,6 +34,32 @@ class MainActivity : ComponentActivity() {
       prefs = getSharedPreferences("mytube_prefs", Context.MODE_PRIVATE)
     )
     playerController = VideoPlayerController(this, lifecycleScope)
+    uiState = AppUiState()
+
+    // YouTube-style system back handling:
+    //   search screen open      -> close search
+    //   video playing (full)    -> minimize to mini player (stay in the app)
+    //   otherwise               -> exit the app
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        val playerOpen = playerController.playerState.value.currentVideo != null
+        val handled = when {
+          uiState.isSearchActive.value -> {
+            uiState.closeSearch()
+            true
+          }
+          playerOpen && !uiState.isPlayerMinimized.value -> {
+            uiState.setPlayerMinimized(true)
+            true
+          }
+          else -> false
+        }
+        if (!handled) {
+          isEnabled = false
+          onBackPressedDispatcher.onBackPressed()
+        }
+      }
+    })
 
     // Background audio playback:
     // If the user enabled "Background Audio Playback", the player keeps going (wake lock +
@@ -52,7 +81,8 @@ class MainActivity : ComponentActivity() {
       MyApplicationTheme(themePreset = currentTheme) {
         YouTubeApp(
           repository = repository,
-          playerController = playerController
+          playerController = playerController,
+          uiState = uiState
         )
       }
     }

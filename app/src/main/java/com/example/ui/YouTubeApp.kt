@@ -92,7 +92,8 @@ enum class MainTab {
 @Composable
 fun YouTubeApp(
     repository: YouTubeRepository,
-    playerController: VideoPlayerController
+    playerController: VideoPlayerController,
+    uiState: AppUiState
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -120,7 +121,7 @@ fun YouTubeApp(
 
     // Navigation & UI Dialog States
     var currentTab by remember { mutableStateOf(MainTab.HOME) }
-    var isSearchActive by remember { mutableStateOf(false) }
+    val isSearchActive by uiState.isSearchActive.collectAsState()
     var showGoogleSignInDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var showWatchTimeDialog by remember { mutableStateOf(false) }
@@ -128,8 +129,8 @@ fun YouTubeApp(
     var showCommentsSheet by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
 
-    // When full player is visible vs minimized
-    var isPlayerMinimized by remember { mutableStateOf(false) }
+    // When full player is visible vs minimized (shared with the Activity's back handling)
+    val isPlayerMinimized by uiState.isPlayerMinimized.collectAsState()
 
     LaunchedEffect(Unit) {
         repository.loadTrendingFeed()
@@ -142,7 +143,7 @@ fun YouTubeApp(
             if (!isSearchActive && currentTab != MainTab.SHORTS && (playerState.currentVideo == null || isPlayerMinimized)) {
                 YouTubeTopAppBar(
                     currentAccount = currentAccount,
-                    onSearchClick = { isSearchActive = true },
+                    onSearchClick = { uiState.openSearch() },
                     onNotificationsClick = {
                         Toast.makeText(context, "3 new notifications from subscribed channels", Toast.LENGTH_SHORT).show()
                     },
@@ -162,10 +163,10 @@ fun YouTubeApp(
                         MiniPlayerBar(
                             state = playerState,
                             controller = playerController,
-                            onExpand = { isPlayerMinimized = false },
+                            onExpand = { uiState.setPlayerMinimized(false) },
                             onClose = {
                                 playerController.closePlayer()
-                                isPlayerMinimized = false
+                                uiState.setPlayerActive()
                             }
                         )
                     }
@@ -288,11 +289,11 @@ fun YouTubeApp(
             if (isSearchActive) {
                 SearchScreen(
                     videos = videos,
-                    onBack = { isSearchActive = false },
+                    onBack = { uiState.closeSearch() },
                     onVideoClick = { video ->
-                        isSearchActive = false
+                        uiState.closeSearch()
                         playerController.setVideo(video)
-                        isPlayerMinimized = false
+                        uiState.setPlayerActive()
                         scope.launch { repository.addToHistory(video, 0) }
                     },
                     onSaveWatchLater = { video ->
@@ -318,7 +319,7 @@ fun YouTubeApp(
                         currentAccount = currentAccount,
                         onVideoClick = { video ->
                             playerController.setVideo(video)
-                            isPlayerMinimized = false
+                            uiState.setPlayerActive()
                             scope.launch { repository.addToHistory(video, 0) }
                         },
                         onShortClick = { short ->
@@ -354,7 +355,7 @@ fun YouTubeApp(
                         subscribedMap = subscribedMap,
                         onVideoClick = { video ->
                             playerController.setVideo(video)
-                            isPlayerMinimized = false
+                            uiState.setPlayerActive()
                             scope.launch { repository.addToHistory(video, 0) }
                         },
                         onSaveWatchLater = { video ->
@@ -406,13 +407,13 @@ fun YouTubeApp(
                             val video = videos.firstOrNull { it.id == hist.videoId }
                                 ?: buildVideoFromRecord(hist.videoId, hist.title, hist.channelName, hist.thumbnailUrl, hist.durationSeconds)
                             playerController.setVideo(video)
-                            isPlayerMinimized = false
+                            uiState.setPlayerActive()
                         },
                         onPlayOfflineVideo = { off ->
                             val video = videos.firstOrNull { it.id == off.videoId }
                                 ?: buildVideoFromRecord(off.videoId, off.title, off.channelName, off.thumbnailUrl, off.durationSeconds)
                             playerController.setVideo(video)
-                            isPlayerMinimized = false
+                            uiState.setPlayerActive()
                         }
                     )
                 }
@@ -438,7 +439,7 @@ fun YouTubeApp(
                     VideoPlayerView(
                         controller = playerController,
                         state = playerState,
-                        onCloseOrMinimize = { isPlayerMinimized = true }
+                        onCloseOrMinimize = { uiState.setPlayerMinimized(true) }
                     )
 
                     // Video Detail (Channels, Like, Dislike, Share, Download, Pinned Comment, Recommended)
