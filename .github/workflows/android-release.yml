@@ -22,26 +22,49 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept licences and install SDK packages
+      - name: Locate Android SDK and accept licences
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses > /dev/null || true
-          # compileSdk = 36 with minorApiLevel = 1 -> "Android SDK Platform 36.1"
-          # AGP 9.1.1 requires SDK Build Tools 36.0.0.
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          sdkmanager "platforms;android-36.1" || \
-            echo "::warning::platforms;android-36.1 not installable here; AGP will download it."
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+          SDKMANAGER=""
+          if [ -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          else
+            SDKMANAGER="$(ls -d "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -1 || true)"
+          fi
+          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+            echo "::error title=android-sdk-missing::no sdkmanager under $SDK"
+            exit 1
+          fi
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+
+          INSTALLED="$("$SDKMANAGER" --list_installed 2>/dev/null || "$SDKMANAGER" --list 2>/dev/null | head -40)"
+          # Surface the installed package list as an annotation so it is readable
+          # through the GitHub API even where raw job logs are unavailable.
+          MSG="${INSTALLED//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"; MSG="${MSG//$'\r'/'%0D'}"
+          echo "::notice title=installed-sdk-packages::${MSG}"
+
+      - name: Install SDK platform 36.1 and build-tools 36.0.0
+        run: |
+          set -uo pipefail
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          # compileSdk = 36 with minorApiLevel = 1 -> "Android SDK Platform 36.1".
+          # AGP downloads it itself when the licences are accepted.
+          "$SDKMANAGER" "platforms;android-36.1" \
+            || echo "::warning title=sdk-36-1::platforms;android-36.1 not installable via sdkmanager; AGP will try to fetch it."
 
       - name: Prepare release signing key
         run: |
@@ -76,7 +99,21 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build release APK and AAB
-        run: ./gradlew --no-daemon --stacktrace assembleRelease bundleRelease
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleRelease bundleRelease 2>&1 | tee build.log
+
+      - name: Report build failure
+        if: failure()
+        run: |
+          set +e
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}  java=$(java -version 2>&1 | head -1)"
+          TAIL="$(tail -n 70 build.log 2>/dev/null)"
+          if [ -z "$TAIL" ]; then
+            TAIL="no build.log - the failure happened before Gradle ran; see the earlier step"
+          fi
+          MSG="${TAIL//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"; MSG="${MSG//$'\r'/'%0D'}"
+          echo "::error title=release-build-failed::${MSG}"
 
       - name: Collect artefacts
         run: |
@@ -86,7 +123,7 @@ jobs:
           find app/build/outputs/bundle/release -name '*.aab' -exec cp -v {} dist/ \;
           ls -lh dist
           for f in dist/*; do
-            echo "$(basename "$f"): $(du -h "$f" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`$(basename "$f")\` — $(du -h "$f" | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
           done
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Signing key used: **${SIGNING_SOURCE}**" >> "$GITHUB_STEP_SUMMARY"

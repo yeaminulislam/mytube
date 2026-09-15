@@ -24,3 +24,6 @@ release-keystore.env
 
 # Build output produced by scripts/build-release.sh
 /dist
+
+# Gradle output captured by CI
+build.log
