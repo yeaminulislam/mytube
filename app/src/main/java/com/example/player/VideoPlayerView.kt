@@ -2,12 +2,9 @@ package com.example.player
 
 import android.app.Activity
 import android.graphics.SurfaceTexture
-import android.os.Handler
-import android.os.Looper
 import android.view.Surface
 import android.view.TextureView
 import android.view.ViewGroup
-import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -93,7 +90,6 @@ import com.example.model.isYouTubeVideo
 import com.example.ui.theme.YouTubePremiumGold
 import com.example.ui.theme.YouTubeRed
 import kotlinx.coroutines.delay
-import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -142,7 +138,6 @@ fun VideoPlayerView(
         }
 
         val isYouTube = isYouTubeVideo(video)
-        val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
         // 2. Video Player Frame / Audio-Only Screen
         if (state.isAudioOnlyMode) {
@@ -186,16 +181,17 @@ fun VideoPlayerView(
                 }
             }
         } else if (isYouTube) {
-            // Real YouTube Player via Hardware Accelerated WebView (YouTube IFrame API).
-            // The JS bridge (window.android.onEvent) reports playback state back to Kotlin,
-            // and the player controls drive the video through ytPlay/ytPause/ytSeek/ytSpeed.
+            // Real YouTube Player via Hardware Accelerated WebView.
+            // The plain embed URL is the reliable way to play YouTube in a WebView:
+            // mediaPlaybackRequiresUserGesture=false lets it autoplay, and the embed
+            // player provides its own controls (play/pause, seek, speed, quality).
             val ytId = if (video.id.length == 11) video.id else {
                 val uri = android.net.Uri.parse(video.videoUrl)
                 uri.getQueryParameter("v") ?: video.id
             }
             AndroidView(
                 factory = { ctx ->
-                    val webView = WebView(ctx).apply {
+                    WebView(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
@@ -207,51 +203,9 @@ fun VideoPlayerView(
                         settings.loadWithOverviewMode = true
                         webChromeClient = WebChromeClient()
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(
-                            object : Any() {
-                                @JavascriptInterface
-                                fun onEvent(json: String) {
-                                    try {
-                                        val obj = JSONObject(json)
-                                        val playerStateCode = obj.optInt("s", -10)
-                                        val timeMs = obj.optLong("t", 0L)
-                                        val durationMs = obj.optLong("d", 0L)
-                                        mainHandler.post {
-                                            controller.reportWebPlayback(
-                                                timeMs = timeMs,
-                                                durationMs = durationMs,
-                                                playing = playerStateCode == 1 || playerStateCode == 3
-                                            )
-                                        }
-                                    } catch (_: Exception) {}
-                                }
-                            },
-                            "android"
-                        )
-                        // Respect the current play/pause state (e.g. user paused from the mini player)
-                        val st = controller.playerState.value
-                        loadDataWithBaseURL(
-                            "https://www.youtube.com",
-                            buildYtEmbedHtml(ytId, autoplay = if (st.isPlaying) 1 else 0, start = (st.currentPositionMs / 1000).toInt()),
-                            "text/html", "utf-8", null
-                        )
-                        tag = ytId
-                    }
-                    controller.attachWebEngine(webView)
-                    webView
-                },
-                update = { wv ->
-                    if (wv.tag != ytId) {
-                        wv.tag = ytId
-                        val st = controller.playerState.value
-                        wv.loadDataWithBaseURL(
-                            "https://www.youtube.com",
-                            buildYtEmbedHtml(ytId, autoplay = if (st.isPlaying) 1 else 0, start = (st.currentPositionMs / 1000).toInt()),
-                            "text/html", "utf-8", null
-                        )
+                        loadUrl("https://www.youtube.com/embed/$ytId?autoplay=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3")
                     }
                 },
-                onRelease = { controller.detachWebEngine() },
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -309,9 +263,9 @@ fun VideoPlayerView(
             }
         }
 
+        if (!isYouTube) {
         // 4. Gesture Detection Overlay
         // Tap to toggle controls, Double-tap left to -10s, Double-tap right to +10s, Vertical drags for volume/brightness
-        // (Works for both native MP4 playback and YouTube WebView playback)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -626,6 +580,24 @@ fun VideoPlayerView(
                 }
             }
         }
+        } else {
+            // Floating Minimize button for YouTube WebView (the embed has its own controls)
+            IconButton(
+                onClick = onCloseOrMinimize,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.65f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Minimize Player",
+                    tint = Color.White
+                )
+            }
+        }
     }
 
     // 7. Settings Modal Bottom Sheet (Quality, Speed, Subtitles, Chapters)
@@ -857,59 +829,3 @@ private fun formatTime(seconds: Long): String {
     val s = seconds % 60
     return if (h > 0) String.format("%d:%02d:%02d", h, m, s) else String.format("%02d:%02d", m, s)
 }
-
-/**
- * HTML page that embeds the real YouTube IFrame Player.
- * - `window.android.onEvent(json)` pushes {s: state, t: timeMs, d: durationMs} to Kotlin.
- * - ytPlay()/ytPause()/ytSeek(sec)/ytSpeed(rate) are called from Kotlin controls.
- */
-private fun buildYtEmbedHtml(videoId: String, autoplay: Int, start: Int): String = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    html, body { width:100%; height:100%; background:#000; overflow:hidden; }
-    #ytplayer { width:100%; height:100%; }
-    </style>
-    <script src="https://www.youtube.com/iframe_api"></script>
-    <script>
-    var player = null;
-    var lastState = -10;
-    function ytPush() {
-      try {
-        if (!player || !player.getCurrentTime) return;
-        var t = player.getCurrentTime() || 0;
-        var d = player.getDuration() || 0;
-        if (window.android && window.android.onEvent) {
-          window.android.onEvent(JSON.stringify({s: lastState, t: Math.round(t * 1000), d: Math.round(d * 1000)}));
-        }
-      } catch (e) {}
-    }
-    function onYouTubeIframeAPIReady() {
-      try {
-        player = new YT.Player('ytplayer', {
-          videoId: '$videoId',
-          width: '100%',
-          height: '100%',
-          playerVars: { autoplay: $autoplay, start: $start, playsinline: 1, rel: 0, modestbranding: 1, iv_load_policy: 3 },
-          events: {
-            onReady: function (e) { ytPush(); },
-            onStateChange: function (e) { lastState = e.data; ytPush(); }
-          }
-        });
-      } catch (e) { player = null; }
-    }
-    setInterval(ytPush, 500);
-    function ytPlay() { try { if (player && player.playVideo) player.playVideo(); } catch (e) {} }
-    function ytPause() { try { if (player && player.pauseVideo) player.pauseVideo(); } catch (e) {} }
-    function ytSeek(sec) { try { if (player && player.seekTo) player.seekTo(sec, true); } catch (e) {} }
-    function ytSpeed(s) { try { if (player && player.setPlaybackRate) player.setPlaybackRate(s); } catch (e) {} }
-    </script>
-    </head>
-    <body>
-    <div id="ytplayer"></div>
-    </body>
-    </html>
-""".trimIndent()

@@ -37,7 +37,7 @@ object YouTubeApiService {
             if (!response.isSuccessful) return@withContext emptyList()
 
             val html = response.body?.string() ?: return@withContext emptyList()
-            parseYtInitialData(html, query)
+            parseYtInitialData(html, "Search")
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -60,7 +60,13 @@ object YouTubeApiService {
             "shorts" -> "viral youtube shorts"
             else -> "$category trending"
         }
-        searchVideos(query)
+        val results = searchVideos(query)
+        // Tag results with a clean category label (not the raw search query)
+        val label = when (category.lowercase()) {
+            "all", "trending" -> "Trending"
+            else -> category.replaceFirstChar { it.uppercase() }
+        }
+        results.map { it.copy(category = label) }
     }
 
     /**
@@ -176,7 +182,8 @@ object YouTubeApiService {
                     channelId = channelId,
                     channelName = channelName,
                     channelAvatarUrl = avatarUrl,
-                    subscriberCount = "1.8M subscribers",
+                    // The UI appends " subscribers" itself, so keep only the count here
+                    subscriberCount = "1.8M",
                     thumbnailUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
                     videoUrl = "https://www.youtube.com/watch?v=$videoId",
                     durationSeconds = durationSeconds,
