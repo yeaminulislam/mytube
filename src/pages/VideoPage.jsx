@@ -1,7 +1,9 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import VideoCard from '../components/VideoCard';
+import VancedPanel from '../components/VancedPanel';
 import { useAuth } from '../context/AuthContext';
+import { useVancedFeatures } from '../hooks/useVancedFeatures';
 import { getVideoDetails, getRelatedVideos, getVideoComments, getChannelDetails, formatViewCount } from '../services/youtubeApi';
 
 export default function VideoPage() {
@@ -17,6 +19,9 @@ export default function VideoPage() {
   const [commentText, setCommentText] = useState('');
   const [localComments, setLocalComments] = useState([]);
   const [showDescription, setShowDescription] = useState(false);
+  const videoRef = useRef(null);
+
+  const vanced = useVancedFeatures(id, videoRef);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -94,18 +99,28 @@ export default function VideoPage() {
     <div className="flex flex-col lg:flex-row gap-6 p-4 lg:p-6 bg-[#0f0f0f] min-h-[calc(100vh-56px)]">
       {/* Main */}
       <div className="flex-1 max-w-[1280px]">
-        {/* Player */}
-        <div className="aspect-video bg-black rounded-xl overflow-hidden">
+        {/* Player - With Vanced Features */}
+        <div className="aspect-video bg-black rounded-xl overflow-hidden relative">
           <iframe
+            ref={videoRef}
             width="100%"
             height="100%"
-            src={`https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1`}
+            src={`https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
             title={video.title}
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           ></iframe>
+          {/* Vanced AdBlock Overlay - Simulated */}
+          {vanced.isAdBlockEnabled && (
+            <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold animate-pulse">
+              🚫 AdBlock ON
+            </div>
+          )}
         </div>
+
+        {/* Vanced Panel - Like Vanced Settings */}
+        <VancedPanel vanced={vanced} />
 
         <div className="mt-4">
           <h1 className="text-xl font-bold leading-7">{video.title}</h1>
@@ -139,8 +154,14 @@ export default function VideoPage() {
                   <span className="text-sm font-medium">{liked ? formatViewCount((parseInt(video.rawLikeCount || 11000) + 1).toString()) : (video.likeCount || '11K')}</span>
                 </button>
                 <div className="w-[1px] bg-[#3f3f3f] my-2" />
-                <button className="px-3 py-2 hover:bg-[#3f3f3f]">👎</button>
+                <button className="px-3 py-2 hover:bg-[#3f3f3f] flex items-center gap-2">
+                  <span>👎</span>
+                  {vanced.dislikeData && <span className="text-xs">{vanced.dislikeData.dislikes > 1000 ? `${(vanced.dislikeData.dislikes/1000).toFixed(1)}K` : vanced.dislikeData.dislikes}</span>}
+                </button>
               </div>
+              <button onClick={vanced.enablePiP} className="bg-[#272727] px-4 py-2 rounded-full text-sm font-medium hover:bg-[#3f3f3f] flex items-center gap-2">
+                <span>📺</span> PiP
+              </button>
               <button className="bg-[#272727] px-4 py-2 rounded-full text-sm font-medium hover:bg-[#3f3f3f] flex items-center gap-2">
                 <span>↗️</span> শেয়ার
               </button>

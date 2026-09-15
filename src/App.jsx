@@ -8,6 +8,7 @@ import ShortsPage from './pages/ShortsPage';
 import Login from './pages/Login';
 import ApiDebugger from './pages/ApiDebugger';
 import InstallPage from './pages/InstallPage';
+import VancedPage from './pages/VancedPage';
 import { AuthProvider } from './context/AuthContext';
 
 function AppContent() {
@@ -58,6 +59,7 @@ function AppContent() {
             <Route path="/login" element={<Login />} />
             <Route path="/debug" element={<ApiDebugger />} />
             <Route path="/install" element={<InstallPage />} />
+            <Route path="/vanced" element={<VancedPage />} />
             <Route path="*" element={
               <div className="flex items-center justify-center h-[calc(100vh-56px)] flex-col gap-4 p-6 text-center">
                 <p className="text-6xl">🚧</p>
