@@ -140,7 +140,7 @@ jobs:
           for apk in dist/*.apk; do
             {
               echo "=== $(basename "$apk") ($(du -h "$apk" | cut -f1)) ==="
-              "$BT/aapt2" dump badging "$apk" | grep -E '^package|^sdkVersion|^targetSdkVersion|^application-label:' || true
+              "$BT/aapt2" dump badging "$apk" | grep -E '^package|^sdkVersion|^minSdkVersion|^targetSdkVersion|^application-label:' || true
               "$BT/apksigner" verify --verbose --print-certs "$apk" 2>&1 || echo 'apksigner verify FAILED'
             } >> "$REPORT"
           done
@@ -162,3 +162,29 @@ jobs:
           path: dist/*
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    name: Publish GitHub release (tags only)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download built artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mytube-release-${{ github.sha }}
+          path: dist
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "MyTube $GITHUB_REF_NAME" \
+            --notes "Signed release build. app-release.apk installs directly; app-release.aab is the Play Store bundle."

@@ -47,6 +47,13 @@ repository secrets: `KEYSTORE_BASE64` (`base64 -w0 my-upload-key.jks`),
 ### Continuous integration
 
 `.github/workflows/android-release.yml` builds `assembleRelease` +
-`bundleRelease` on every push to `main` (and on `arena/**` branches) and
-uploads the APK and AAB as a workflow artefact. Open the run under
+`bundleRelease` on every push to `main` (and on `arena/**` branches), verifies
+the output with `apksigner verify` and `aapt2 dump badging`, and uploads the
+APK and AAB as a workflow artefact. Open the run under
 **Actions → Android Release Build → Artifacts** to download them.
+
+Pushing a `v*` tag additionally publishes a GitHub release with both files:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
