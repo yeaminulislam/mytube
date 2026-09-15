@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="90dp"
+    android:height="24dp"
+    android:viewportWidth="90"
+    android:viewportHeight="24">
+    <!-- YouTube Red Icon Box -->
+    <path
+        android:fillColor="#FF0000"
+        android:pathData="M27.97,3.16c-0.33,-1.23 -1.3,-2.2 -2.53,-2.53C23.2,0 14.3,0 14.3,0S5.4,0 3.16,0.63C1.93,0.96 0.96,1.93 0.63,3.16 0,5.39 0,10 0,10s0,4.61 0.63,6.84c0.33,1.23 1.3,2.2 2.53,2.53C5.4,20 14.3,20 14.3,20s8.9,0 11.14,-0.63c1.23,-0.33 2.2,-1.3 2.53,-2.53C28.6,14.61 28.6,10 28.6,10s0,-4.61 -0.63,-6.84z" />
+    <!-- White Play Triangle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11.44,14.28L18.88,10 11.44,5.72z" />
+</vector>

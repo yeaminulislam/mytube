@@ -1,0 +1,6 @@
+{
+  "name": "YouTube",
+  "description": "Full-featured YouTube clone with Core Video Player, Shorts, Live streaming, Studio creator hub, Premium capabilities, and Google Sign-In.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
